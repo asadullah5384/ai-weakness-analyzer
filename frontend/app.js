@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // API Configuration
+    const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+        ? 'http://127.0.0.1:8000' 
+        : 'https://ai-weakness-analyzer-api.onrender.com'; // Replace this URL after deploying to Render
+
     // 1. Navigation Logic
     const navLinks = document.querySelectorAll('.nav-links li');
     const views = document.querySelectorAll('.view-section');
@@ -52,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('loadingIndicator').classList.remove('hidden');
 
         try {
-            const response = await fetch('http://localhost:8000/api/analyze', {
+            const response = await fetch(`${API_BASE_URL}/api/analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_name: userName, user_email: userEmail, subjects })
@@ -132,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const userId = localStorage.getItem('userId');
         if(!userId) return;
         try {
-            const response = await fetch(`http://localhost:8000/api/history/${userId}`);
+            const response = await fetch(`${API_BASE_URL}/api/history/${userId}`);
             const data = await response.json();
             if(data.performance && data.performance.length > 0) renderAnalytics(data.performance);
         } catch(e) { console.error(e); }
