@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // API Configuration
     const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
         ? 'http://127.0.0.1:8000' 
-        : 'https://ai-weakness-analyzer-api.onrender.com'; // Replace this URL after deploying to Render
+        : '/api'; // Same domain on Vercel
 
     // 1. Navigation Logic
     const navLinks = document.querySelectorAll('.nav-links li');

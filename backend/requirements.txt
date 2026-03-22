@@ -4,3 +4,4 @@ supabase
 groq
 pydantic
 python-dotenv
+mangum
