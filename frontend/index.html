@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Study Assistant & Analyzer</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75' fill='%2358a6ff'>📚</text></svg>">
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,6 +13,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div class="layout-wrapper">
@@ -24,7 +27,8 @@
             <ul class="nav-links">
                 <li class="active" data-target="dashboard-view"><i class="fa-solid fa-house"></i> Dashboard</li>
                 <li data-target="analytics-view"><i class="fa-solid fa-chart-line"></i> Analytics</li>
-                <li data-target="timer-view"><i class="fa-solid fa-stopwatch"></i> Pomodoro</li>
+                <li data-target="timer-view"><i class="fa-solid fa-stopwatch"></i> Countdown</li>
+                <li id="logoutBtn" style="color:var(--danger);margin-top:auto;"><i class="fa-solid fa-right-from-bracket"></i> Logout</li>
             </ul>
         </nav>
 
@@ -42,6 +46,21 @@
                     <div class="user-info">
                         <input type="text" id="userName" placeholder="Your Name" class="input-field">
                         <input type="email" id="userEmail" placeholder="Your Email (for tracking)" class="input-field">
+                    </div>
+
+                    <div class="selection-group">
+                        <select id="typeSelect" class="input-field">
+                            <option value="">Select Level (School/College/Uni)</option>
+                            <option value="School">School</option>
+                            <option value="College">College</option>
+                            <option value="University">University</option>
+                        </select>
+                        <select id="instituteSelect" class="input-field" disabled>
+                            <option value="">Select Institute</option>
+                        </select>
+                        <select id="classSelect" class="input-field" disabled>
+                            <option value="">Select Class / Field</option>
+                        </select>
                     </div>
                     
                     <div id="subjectsList" class="subjects-list"></div>
@@ -85,6 +104,9 @@
 
                     <div class="ai-feedback-box">
                         <h3><i class="fa-solid fa-robot"></i> AI Tutor Feedback</h3>
+                        <div id="aiSummary" class="ai-summary-box hidden">
+                            <strong>Summary:</strong> <span id="aiSummaryText"></span>
+                        </div>
                         <div id="aiFeedbackContent" class="feedback-content"></div>
                     </div>
 
@@ -112,10 +134,10 @@
                 </div>
             </div>
 
-            <!-- View 3: Pomodoro Timer -->
+            <!-- View 3: Countdown Timer -->
             <div id="timer-view" class="view-section hidden-view">
                 <header class="header">
-                    <h1>Focus Mode</h1>
+                    <h1>Countdown Timer</h1>
                     <p>Start a distraction-free study session.</p>
                 </header>
 
@@ -144,9 +166,199 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="card goals-card">
+                    <h2><i class="fa-solid fa-bullseye"></i> Academic Goals</h2>
+                    <div class="goal-input-row">
+                        <input type="text" id="newGoalInput" placeholder="Set a new goal (e.g. Study Physics for 2 hours)" class="input-field">
+                        <button id="addGoalBtn" class="btn btn-primary"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <ul id="goalsList" class="goals-list">
+                        <!-- Goals will appear here -->
+                    </ul>
+                </div>
             </div>
         </main>
     </div>
+
+    <!-- Auth Overlay - 6-Step Signup Flow -->
+    <div id="authOverlay" class="auth-overlay">
+        <div class="auth-card card">
+            <div class="auth-header">
+                <i class="fa-solid fa-graduation-cap"></i>
+                <h2>Welcome to StudyAssist</h2>
+                <p id="authSubtitle">Create your account in 6 simple steps</p>
+            </div>
+
+            <form id="authForm" class="auth-form">
+                <!-- Step 1: Name -->
+                <div class="form-step" id="authStep1">
+                    <h3>Step 1 of 6: Your Name</h3>
+                    <input type="text" id="authName" placeholder="Enter your full name" class="input-field" required>
+                    <button type="button" class="btn btn-primary btn-block" onclick="nextAuthStep(1)">Continue</button>
+                </div>
+
+                <!-- Step 2: Grade Level -->
+                <div class="form-step hidden" id="authStep2">
+                    <h3>Step 2 of 6: Grade Level</h3>
+                    <select id="authLevel" class="input-field" required>
+                        <option value="">Select your level</option>
+                        <option value="School">School</option>
+                        <option value="College">College</option>
+                        <option value="University">University</option>
+                    </select>
+                    <div class="step-buttons">
+                        <button type="button" class="btn btn-secondary" onclick="prevAuthStep(2)">Back</button>
+                        <button type="button" class="btn btn-primary" onclick="nextAuthStep(2)">Continue</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Institute -->
+                <div class="form-step hidden" id="authStep3">
+                    <h3>Step 3 of 6: Institute</h3>
+                    <select id="authInstitute" class="input-field" required disabled>
+                        <option value="">Select your institute</option>
+                    </select>
+                    <div class="step-buttons">
+                        <button type="button" class="btn btn-secondary" onclick="prevAuthStep(3)">Back</button>
+                        <button type="button" class="btn btn-primary" onclick="nextAuthStep(3)">Continue</button>
+                    </div>
+                </div>
+
+                <!-- Step 4: Class/Year -->
+                <div class="form-step hidden" id="authStep4">
+                    <h3>Step 4 of 6: Class / Year</h3>
+                    <select id="authClass" class="input-field" required disabled>
+                        <option value="">Select your class/year</option>
+                    </select>
+                    <div class="step-buttons">
+                        <button type="button" class="btn btn-secondary" onclick="prevAuthStep(4)">Back</button>
+                        <button type="button" class="btn btn-primary" onclick="nextAuthStep(4)">Continue</button>
+                    </div>
+                </div>
+
+                <!-- Step 5: Field (College/University only) -->
+                <div class="form-step hidden" id="authStep5">
+                    <h3>Step 5 of 6: Field / Stream</h3>
+                    <select id="authField" class="input-field" disabled>
+                        <option value="">Select your field</option>
+                    </select>
+                    <div class="step-buttons">
+                        <button type="button" class="btn btn-secondary" onclick="prevAuthStep(5)">Back</button>
+                        <button type="button" class="btn btn-primary" onclick="nextAuthStep(5)">Continue</button>
+                    </div>
+                </div>
+
+                <!-- Step 6: Email & Password -->
+                <div class="form-step hidden" id="authStep6">
+                    <h3>Step 6 of 6: Account Details</h3>
+                    <input type="email" id="authEmail" placeholder="Email address" class="input-field" required>
+                    <input type="password" id="authPassword" placeholder="Password (min 6 characters)" class="input-field" required minlength="6">
+                    <div class="step-buttons">
+                        <button type="button" class="btn btn-secondary" onclick="prevAuthStep(6)">Back</button>
+                        <button type="submit" class="btn btn-primary">Create Account</button>
+                    </div>
+                </div>
+            </form>
+
+            <div id="authError" class="error-text hidden"></div>
+            <div id="authSuccess" class="success-text hidden"></div>
+        </div>
+    </div>
+
+    <!-- Profile Creation Modal (Naya) -->
+    <div id="profileModal" class="auth-overlay hidden">
+        <div class="auth-card card">
+            <div class="auth-header">
+                <i class="fa-solid fa-user-circle"></i>
+                <h2>Complete Your Profile</h2>
+                <p id="profileSubtitle">Help us customize your learning experience</p>
+            </div>
+            
+            <form id="profileForm" class="auth-form">
+                <div class="form-step" id="step1">
+                    <h3>Step 1 of 4: Education Level</h3>
+                    <select id="profileLevel" class="input-field" required>
+                        <option value="">Select Your Level</option>
+                        <option value="School">School</option>
+                        <option value="College">College</option>
+                        <option value="University">University</option>
+                    </select>
+                    <button type="button" class="btn btn-primary btn-block" onclick="nextStep(1)">Continue</button>
+                </div>
+
+                <div class="form-step hidden" id="step2">
+                    <h3>Step 2 of 4: Institute/School</h3>
+                    <select id="profileInstitute" class="input-field" required disabled>
+                        <option value="">Select Your Institute</option>
+                    </select>
+                    <div class="step-buttons">
+                        <button type="button" class="btn btn-secondary" onclick="prevStep(2)">Back</button>
+                        <button type="button" class="btn btn-primary" onclick="nextStep(2)">Continue</button>
+                    </div>
+                </div>
+
+                <div class="form-step hidden" id="step3">
+                    <h3>Step 3 of 4: Class / Year</h3>
+                    <select id="profileClass" class="input-field" required disabled>
+                        <option value="">Select Your Class/Year</option>
+                    </select>
+                    <div class="step-buttons">
+                        <button type="button" class="btn btn-secondary" onclick="prevStep(3)">Back</button>
+                        <button type="button" class="btn btn-primary" onclick="nextStep(3)">Continue</button>
+                    </div>
+                </div>
+
+                <div class="form-step hidden" id="step4">
+                    <h3>Step 4 of 4: Field / Stream (Optional)</h3>
+                    <select id="profileField" class="input-field" disabled>
+                        <option value="">Select Your Field (Optional)</option>
+                    </select>
+                    <div class="step-buttons">
+                        <button type="button" class="btn btn-secondary" onclick="prevStep(4)">Back</button>
+                        <button type="submit" class="btn btn-primary">Complete Profile</button>
+                    </div>
+                </div>
+            </form>
+            
+            <div id="profileError" class="error-text hidden"></div>
+            <div id="profileSuccess" class="success-text hidden"></div>
+        </div>
+    </div>
+
+    <!-- AI Chatbot -->
+    <div id="chatbotBtn" class="chatbot-btn">
+        <i class="fa-solid fa-robot"></i>
+    </div>
+
+    <div id="chatbotModal" class="chatbot-modal hidden">
+        <div class="chatbot-header">
+            <h3><i class="fa-solid fa-robot"></i> AI Study Assistant</h3>
+            <button id="closeChatbot" class="close-btn">&times;</button>
+        </div>
+        <div id="chatMessages" class="chat-messages">
+            <div class="message bot-message">
+                <div class="message-avatar">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div class="message-content">
+                    <p>Hi! I'm your AI study assistant. I can help you with:</p>
+                    <ul>
+                        <li>Study tips and techniques</li>
+                        <li>Subject-specific guidance</li>
+                        <li>Time management advice</li>
+                        <li>Motivational support</li>
+                    </ul>
+                    <p>What would you like to know?</p>
+                </div>
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chatInput" placeholder="Ask me anything about studying..." class="chat-input">
+            <button id="sendChatBtn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

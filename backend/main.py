@@ -10,13 +10,26 @@ from ai_service import generate_feedback
 
 app = FastAPI(title="AI Weakness Analyzer API")
 
+# Add CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins for development
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/api/health")
+async def health_check():
+    return {
+        "status": "ok",
+        "env": {
+            "SUPABASE_URL": bool(os.environ.get("SUPABASE_URL")),
+            "SUPABASE_KEY": bool(os.environ.get("SUPABASE_KEY")),
+            "GROQ_API_KEY": bool(os.environ.get("GROQ_API_KEY")),
+            "GROQ_MODEL_ID": bool(os.environ.get("GROQ_MODEL_ID"))
+        }
+    }
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
 async def analyze_performance(request: AnalyzeRequest):
@@ -107,6 +120,40 @@ async def analyze_performance(request: AnalyzeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==========================================
+# INSTITUTES, CLASSES, & SUBJECTS ENDPOINTS
+# ==========================================
+
+@app.get("/api/institutes")
+async def get_institutes(type: str = None):
+    """Get all institutes, optionally filtered by type (School/College/University)"""
+    try:
+        if type:
+            res = supabase.table("institutes").select("*").eq("type", type).execute()
+        else:
+            res = supabase.table("institutes").select("*").execute()
+        return res.data if res.data else []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/classes/{institute_id}")
+async def get_classes(institute_id: str):
+    """Get all classes for a specific institute"""
+    try:
+        res = supabase.table("classes").select("*").eq("institute_id", institute_id).execute()
+        return res.data if res.data else []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/subjects/{class_id}")
+async def get_subjects(class_id: str):
+    """Get all subjects for a specific class"""
+    try:
+        res = supabase.table("subjects").select("*").eq("class_id", class_id).execute()
+        return res.data if res.data else []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/history/{user_id}")
 async def get_history(user_id: str):
     try:
@@ -119,6 +166,9 @@ async def get_history(user_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Mount frontend directory
+# Mount frontend directory if it exists (for local testing)
 frontend_path = os.path.join(os.path.dirname(__file__), "../frontend")
-app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+else:
+    print(f"Frontend path {frontend_path} not found, skipping mount. (Expected on Vercel)")
