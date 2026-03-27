@@ -39,6 +39,7 @@ class UserAuth(BaseModel):
 class SubjectInput(BaseModel):
     name: str
     marks: int
+    max_marks: Optional[int] = 100
     topic_id: Optional[str] = None
 
 class InstituteBase(BaseModel):
@@ -51,12 +52,21 @@ class ClassBase(BaseModel):
 class AnalyzeRequest(BaseModel):
     user_name: Optional[str] = "Student"
     user_email: Optional[str] = None
+    record_month: Optional[str] = None
+    record_year: Optional[int] = None
     subjects: List[SubjectInput]
 
 class SubjectResult(BaseModel):
     name: str
     marks: int
     category: str
+
+class GoalInput(BaseModel):
+    user_id: str
+    goal_text: str
+
+class GoalUpdateInput(BaseModel):
+    goal_text: str
 
 class AnalyzeResponse(BaseModel):
     user_id: str
@@ -93,26 +103,16 @@ def generate_feedback(student_name: str, subjects: list, weak_subjects: list, to
         prompt += f"- {sub['name']}: {sub['marks']} ({sub['category']})\n"
     
     prompt += """
-Please act as an empathetic, expert human tutor. Provide personalized, highly encouraging feedback in exactly this structure. Write naturally, not robotically. DO NOT use markdown tables or complex formatting.
+Act as a strict AI study analyzer. Analyze the student's marks and provide ONLY these two things in bullet points:
 
-Output Format Example:
-AI Summary:
-[A very short 1-sentence summary of the overall status]
+1. Weaknesses – Which subjects or topics the student is weak in and what exactly is lacking. Be specific about the gaps.
+2. Areas for Improvement – What the student needs to practice more and how to improve in those weak areas.
 
-Motivational Greeting:
-[Greeting addressing the student's name and overall performance]
-
-Student Analysis:
-[Write a 2-3 sentence paragraph explaining which subjects the student is weak in and which they are strong in. Recommend exactly how many hours/minutes per week they should dedicate to EACH subject based on their marks.]
-
-Detailed Weekly Study Schedule:
-Please assign specific study time slots showing exactly how the student should divide their week's time from Monday to Friday. Prioritize the weak subjects.
-Monday:
-• [Time] - [Subject/Task]
-...
-Weekend Roadmap:
-Saturday: ...
-Sunday: ...
+IMPORTANT RULES:
+- Do NOT provide any resources, links, or URLs.
+- Do NOT suggest any external websites or platforms.
+- Do NOT give general motivational advice.
+- Keep it short, direct, and focused only on the two sections above.
 """
     try:
         chat_completion = groq_client.chat.completions.create(
@@ -287,19 +287,28 @@ async def analyze_performance(request: AnalyzeRequest):
         results = []
         weak_subjects_list = []
         total_marks = 0
-        total_max_marks = len(request.subjects) * 100
+        total_max_marks = sum(sub.max_marks for sub in request.subjects)
         top_subject = None
+        top_perc = -1
         weakest_subject = None
+        weakest_perc = 101
         
         for sub in request.subjects:
-            cat = "Weak" if sub.marks < 50 else ("Average" if sub.marks <= 75 else "Strong")
+            perc = (sub.marks / sub.max_marks) * 100 if sub.max_marks > 0 else 0
+            cat = "Weak" if perc < 50 else ("Average" if perc <= 75 else "Strong")
             res = SubjectResult(name=sub.name, marks=sub.marks, category=cat)
             results.append(res)
             total_marks += sub.marks
             
-            if top_subject is None or sub.marks > top_subject.marks: top_subject = res
-            if weakest_subject is None or sub.marks < weakest_subject.marks: weakest_subject = res
-            if cat == "Weak": weak_subjects_list.append({"name": sub.name, "marks": sub.marks, "category": cat})
+            if perc > top_perc: 
+                top_subject = res
+                top_perc = perc
+            if perc < weakest_perc: 
+                weakest_subject = res
+                weakest_perc = perc
+                
+            if cat == "Weak": 
+                weak_subjects_list.append({"name": sub.name, "marks": sub.marks, "category": cat})
                 
             # Subject & Record
             subj_res = supabase.table("subjects").select("*").eq("name", sub.name).execute()
@@ -309,7 +318,12 @@ async def analyze_performance(request: AnalyzeRequest):
                 sid = subj_res.data[0]["subject_id"]
                 
             supabase.table("performance_records").insert({
-                "user_id": user_id, "subject_id": sid, "marks": sub.marks, "category": cat
+                "user_id": user_id, 
+                "subject_id": sid, 
+                "marks": sub.marks, 
+                "category": cat,
+                "record_month": request.record_month,
+                "record_year": request.record_year
             }).execute()
 
         # 3. AI Feedback
@@ -370,13 +384,47 @@ async def save_session(session: StudySessionInput):
 
 @app.get("/api/goals/{user_id}")
 async def get_goals(user_id: str):
-    res = supabase.table("goals").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
-    return res.data
+    try:
+        # Auto-sync user to prevent foreign key issues
+        ures = supabase.table("users").select("user_id").eq("user_id", user_id).execute()
+        if not ures.data:
+            supabase.table("users").insert({"user_id": user_id, "name": "Student", "email": f"{user_id}@student.com"}).execute()
+            
+        res = supabase.table("goals").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/goals")
 async def create_goal(goal: GoalInput):
-    res = supabase.table("goals").insert(goal.dict()).execute()
-    return res.data[0]
+    try:
+        # Auto-sync user to prevent foreign key issues
+        ures = supabase.table("users").select("user_id").eq("user_id", goal.user_id).execute()
+        if not ures.data:
+            supabase.table("users").insert({"user_id": goal.user_id, "name": "Student", "email": f"{goal.user_id}@student.com"}).execute()
+            
+        res = supabase.table("goals").insert(goal.dict()).execute()
+        return res.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/goals/{goal_id}")
+async def delete_goal(goal_id: str):
+    try:
+        res = supabase.table("goals").delete().eq("goal_id", goal_id).execute()
+        return {"message": "Goal deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/goals/{goal_id}")
+async def update_goal(goal_id: str, goal: GoalUpdateInput):
+    try:
+        res = supabase.table("goals").update({"goal_text": goal.goal_text}).eq("goal_id", goal_id).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Goal not found")
+        return res.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Chatbot Endpoint ---
 @app.post("/api/chat")
@@ -400,17 +448,15 @@ async def chat_with_ai(request: dict):
         if context.get("field"):
             context_str += f"Their field is {context['field']}. "
 
-        prompt = f"""{context_str}You are an empathetic AI study assistant for students in Pakistan. 
-        Respond to: "{message}"
+        prompt = f"""{context_str}
+        Student's input: "{message}"
         
-        Guidelines:
-        - Be encouraging and supportive
-        - Provide practical study tips
-        - Keep responses concise but helpful
-        - Use simple language
-        - If they ask about subjects, relate to Sindh Board curriculum
-        - If they need motivation, give specific actionable advice
-        - Always end with a positive note"""
+        Answer the student's question directly and clearly.
+        Do not provide feedback, suggestions, or timetable.
+        Only respond to study-related questions.
+        Give the best possible explanation for the question asked.
+        Provide raw http links if suggesting videos so they can be parsed by our app.
+        """
 
         chat_completion = groq_client.chat.completions.create(
             messages=[

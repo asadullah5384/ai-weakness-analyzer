@@ -26,8 +26,8 @@
             </div>
             <ul class="nav-links">
                 <li class="active" data-target="dashboard-view"><i class="fa-solid fa-house"></i> Dashboard</li>
-                <li data-target="analytics-view"><i class="fa-solid fa-chart-line"></i> Analytics</li>
-                <li data-target="timer-view"><i class="fa-solid fa-stopwatch"></i> Countdown</li>
+                <li data-target="analytics-view"><i class="fa-solid fa-chart-line"></i> STATS</li>
+                <li data-target="timer-view"><i class="fa-solid fa-stopwatch"></i> StudyClock</li>
                 <li id="logoutBtn" style="color:var(--danger);margin-top:auto;"><i class="fa-solid fa-right-from-bracket"></i> Logout</li>
             </ul>
         </nav>
@@ -36,38 +36,47 @@
         <main class="main-content">
             <!-- View 1: Dashboard -->
             <div id="dashboard-view" class="view-section active-view">
-                <header class="header">
-                    <h1>AI Weakness Analyzer</h1>
-                    <p>Enter subjects to receive personalized AI feedback and performance tracking.</p>
+                <header class="header dashboard-header">
+                    <button id="mobileMenuBtn" class="hamburger-btn hidden"><i class="fa-solid fa-bars"></i></button>
+                    <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                            <h1>AI Weakness Analyzer</h1>
+                            <span id="headerStudentContext" class="badge" style="background: rgba(88,166,255,0.1); color: var(--accent); padding: 0.4rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;"></span>
+                        </div>
+                        <p>Enter subjects to receive personalized AI feedback and performance tracking.</p>
+                    </div>
                 </header>
                 
                 <section class="card input-section" id="inputSection">
-                    <h2><i class="fa-solid fa-pen-to-square"></i> New Entry</h2>
-                    <div class="user-info">
-                        <input type="text" id="userName" placeholder="Your Name" class="input-field">
-                        <input type="email" id="userEmail" placeholder="Your Email (for tracking)" class="input-field">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+                        <h2 style="margin: 0;"><i class="fa-solid fa-pen-to-square"></i> Subject Marks Evaluation</h2>
+                        
+                        <div class="date-selectors" style="display: flex; gap: 0.5rem; align-items: center;">
+                            <label class="text-muted"><i class="fa-regular fa-calendar-days"></i> Exam Period:</label>
+                            <select id="recordMonth" class="input-field" style="width: auto; padding: 0.5rem;">
+                                <option value="January">January</option><option value="February">February</option>
+                                <option value="March" selected>March</option><option value="April">April</option>
+                                <option value="May">May</option><option value="June">June</option>
+                                <option value="July">July</option><option value="August">August</option>
+                                <option value="September">September</option><option value="October">October</option>
+                                <option value="November">November</option><option value="December">December</option>
+                            </select>
+                            <select id="recordYear" class="input-field" style="width: auto; padding: 0.5rem;">
+                                <!-- Handled by app.js generation loop -->
+                            </select>
+                        </div>
                     </div>
-
-                    <div class="selection-group">
-                        <select id="typeSelect" class="input-field">
-                            <option value="">Select Level (School/College/Uni)</option>
-                            <option value="School">School</option>
-                            <option value="College">College</option>
-                            <option value="University">University</option>
-                        </select>
-                        <select id="instituteSelect" class="input-field" disabled>
-                            <option value="">Select Institute</option>
-                        </select>
-                        <select id="classSelect" class="input-field" disabled>
-                            <option value="">Select Class / Field</option>
-                        </select>
-                    </div>
+                    <!-- Academic profile inputs were moved to Signup Onboarding -->
                     
                     <div id="subjectsList" class="subjects-list"></div>
                     
-                    <button id="addSubjectBtn" class="btn btn-secondary"><i class="fa-solid fa-plus"></i> Add Subject</button>
-                    <button id="analyzeBtn" class="btn btn-primary"><i class="fa-solid fa-wand-magic-sparkles"></i> Analyze & Save</button>
-                    <div id="loadingIndicator" class="hidden loader-container">
+                    <div class="action-group" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-top: 1rem;">
+                        <button id="addSubjectBtn" class="btn btn-secondary"><i class="fa-solid fa-plus"></i> Add Subject</button>
+                        
+                        <button id="analyzeBtn" class="btn btn-primary" style="margin-left: auto;"><i class="fa-solid fa-wand-magic-sparkles"></i> Analyze & Save</button>
+                    </div>
+
+                    <div id="loadingIndicator" class="hidden loader-container" style="margin-top: 1rem;">
                         <div class="spinner"></div><p>Analyzing and talking to AI...</p>
                     </div>
                 </section>
@@ -116,9 +125,23 @@
 
             <!-- View 2: Analytics -->
             <div id="analytics-view" class="view-section hidden-view">
-                <header class="header">
-                    <h1>Performance Analytics</h1>
-                    <p>Track your growth and weakness trends over time.</p>
+                <header class="header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h1>STATS</h1>
+                        <p>Track your growth and weakness trends over time.</p>
+                    </div>
+                    <div class="filter-group" style="display: flex; gap: 0.5rem; align-items: center; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 8px;">
+                        <label class="text-muted"><i class="fa-solid fa-filter"></i> Filter:</label>
+                        <select id="analyticsMonthFilter" class="input-field" style="width: auto; padding: 0.4rem; font-size: 0.9rem;">
+                            <option value="Overall">Overall (All Months)</option>
+                            <option value="January">January</option><option value="February">February</option>
+                            <option value="March">March</option><option value="April">April</option>
+                            <option value="May">May</option><option value="June">June</option>
+                            <option value="July">July</option><option value="August">August</option>
+                            <option value="September">September</option><option value="October">October</option>
+                            <option value="November">November</option><option value="December">December</option>
+                        </select>
+                    </div>
                 </header>
                 
                 <div class="card analytics-card">
@@ -134,10 +157,10 @@
                 </div>
             </div>
 
-            <!-- View 3: Countdown Timer -->
+            <!-- View 3: StudyClock -->
             <div id="timer-view" class="view-section hidden-view">
                 <header class="header">
-                    <h1>Countdown Timer</h1>
+                    <h1>StudyClock</h1>
                     <p>Start a distraction-free study session.</p>
                 </header>
 
@@ -145,186 +168,101 @@
                     <div class="timer-display" id="timerDisplay">25:00</div>
                     <p id="timerStatus" class="timer-status text-muted">Ready to Focus</p>
                     
+                    <div class="timer-settings" style="margin-bottom: 1.5rem; display: flex; justify-content: center; align-items: center; gap: 0.5rem;">
+                        <input type="number" id="customTimerInput" class="input-field" value="25" min="1" max="180" style="width: 80px; text-align: center;">
+                        <span class="text-muted">mins</span>
+                        <button id="setTimerBtn" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Set Time</button>
+                    </div>
+
                     <div class="timer-controls">
                         <button id="startTimerBtn" class="btn btn-primary"><i class="fa-solid fa-play"></i> Start</button>
                         <button id="pauseTimerBtn" class="btn btn-secondary hidden"><i class="fa-solid fa-pause"></i> Pause</button>
                         <button id="resetTimerBtn" class="btn btn-danger"><i class="fa-solid fa-rotate-right"></i> Reset</button>
-                        <button id="breakTimerBtn" class="btn btn-secondary"><i class="fa-solid fa-mug-hot"></i> Break</button>
                     </div>
                 </div>
 
-                <div class="card stats-card">
-                    <h2><i class="fa-solid fa-fire"></i> Today's Focus Tracking</h2>
-                    <div class="focus-stats">
-                        <div class="stat-box">
-                            <i class="fa-solid fa-clock"></i>
-                            <div><span id="totalFocusMins">0</span> mins</div>
-                        </div>
-                        <div class="stat-box">
-                            <i class="fa-solid fa-check-circle"></i>
-                            <div><span id="sessionsCompleted">0</span> sessions</div>
-                        </div>
+                <div class="card goals-card" style="margin-top: 2rem;">
+                    <h2 style="font-size: 1.25rem;"><i class="fa-solid fa-bullseye" style="color: var(--accent);"></i> Academic Goals</h2>
+                    <p class="text-muted" style="margin-bottom: 1rem; font-size: 0.9rem;">Set manageable tasks before starting your focus timer.</p>
+                    <div class="goal-input-row" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+                        <input type="text" id="newGoalInput" placeholder="Set a new goal (e.g. Study Physics Ch 3)" class="input-field" style="flex: 1; padding: 0.75rem;">
+                        <button id="addGoalBtn" class="btn btn-primary" style="padding: 0 1.2rem;"><i class="fa-solid fa-plus"></i></button>
                     </div>
-                </div>
-
-                <div class="card goals-card">
-                    <h2><i class="fa-solid fa-bullseye"></i> Academic Goals</h2>
-                    <div class="goal-input-row">
-                        <input type="text" id="newGoalInput" placeholder="Set a new goal (e.g. Study Physics for 2 hours)" class="input-field">
-                        <button id="addGoalBtn" class="btn btn-primary"><i class="fa-solid fa-plus"></i></button>
-                    </div>
-                    <ul id="goalsList" class="goals-list">
+                    <ol id="goalsList" class="goals-list" style="padding-left: 1.5rem; color: var(--text-main);">
                         <!-- Goals will appear here -->
-                    </ul>
+                    </ol>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Auth Overlay - 6-Step Signup Flow -->
+    <!-- Auth Overlay - 6-Step Split-Screen Flow -->
     <div id="authOverlay" class="auth-overlay">
-        <div class="auth-card card">
-            <div class="auth-header">
-                <i class="fa-solid fa-graduation-cap"></i>
-                <h2>Welcome to StudyAssist</h2>
-                <p id="authSubtitle">Create your account in 6 simple steps</p>
+        <div class="auth-split-container">
+            <!-- Left Side Cover -->
+            <div class="auth-left">
+                <div class="auth-left-content">
+                    <h1>StudyAssist</h1>
+                    <p>Your intelligent path to academic excellence.</p>
+                </div>
             </div>
-
-            <form id="authForm" class="auth-form">
-                <!-- Step 1: Name -->
-                <div class="form-step" id="authStep1">
-                    <h3>Step 1 of 6: Your Name</h3>
-                    <input type="text" id="authName" placeholder="Enter your full name" class="input-field" required>
-                    <button type="button" class="btn btn-primary btn-block" onclick="nextAuthStep(1)">Continue</button>
+            
+            <!-- Right Side Form -->
+            <div class="auth-right">
+                <div class="auth-header">
+                    <h2>Create an account</h2>
+                    <p id="authSubtitle">Already have an account? <a href="#" id="toggleAuthMode">Log in</a></p>
                 </div>
 
-                <!-- Step 2: Grade Level -->
-                <div class="form-step hidden" id="authStep2">
-                    <h3>Step 2 of 6: Grade Level</h3>
-                    <select id="authLevel" class="input-field" required>
-                        <option value="">Select your level</option>
-                        <option value="School">School</option>
-                        <option value="College">College</option>
-                        <option value="University">University</option>
-                    </select>
-                    <div class="step-buttons">
-                        <button type="button" class="btn btn-secondary" onclick="prevAuthStep(2)">Back</button>
-                        <button type="button" class="btn btn-primary" onclick="nextAuthStep(2)">Continue</button>
+                <form id="authForm" class="auth-form">
+                    <!-- Signup View (Default) -->
+                    <div id="signupStep">
+                        <input type="text" id="authName" placeholder="Full Name" class="input-field" required>
+                        <input type="email" id="authEmail" placeholder="Email address" class="input-field" required>
+                        <input type="password" id="authPassword" placeholder="Create password (min 6 chars)" class="input-field" required minlength="6">
+                        
+                        <div class="onboarding-group">
+                            <select id="authTypeSelect" class="input-field" required>
+                                <option value="">Select Level</option>
+                                <option value="School">School</option>
+                                <option value="College">College</option>
+                                <option value="University">University</option>
+                            </select>
+                            
+                            <select id="authInstituteSelect" class="input-field" required disabled>
+                                <option value="">Select Institute</option>
+                            </select>
+
+                            <select id="authClassSelect" class="input-field" required disabled>
+                                <option value="">Select Class / Semester</option>
+                            </select>
+
+                            <select id="authFieldSelect" class="input-field hidden" disabled>
+                                <option value="">Select Field</option>
+                            </select>
+                        </div>
+
+                        <div class="terms-checkbox" style="display: flex; gap: 0.5rem; margin: 1rem 0;">
+                            <input type="checkbox" id="termsCheck" required>
+                            <label for="termsCheck" class="text-muted">I agree to the Terms & Conditions</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block" id="authSubmitBtn">Sign Up</button>
                     </div>
-                </div>
 
-                <!-- Step 3: Institute -->
-                <div class="form-step hidden" id="authStep3">
-                    <h3>Step 3 of 6: Institute</h3>
-                    <select id="authInstitute" class="input-field" required disabled>
-                        <option value="">Select your institute</option>
-                    </select>
-                    <div class="step-buttons">
-                        <button type="button" class="btn btn-secondary" onclick="prevAuthStep(3)">Back</button>
-                        <button type="button" class="btn btn-primary" onclick="nextAuthStep(3)">Continue</button>
+                    <!-- Login View (Hidden by default, shown via JS toggle) -->
+                    <div id="loginStep" class="hidden">
+                        <input type="email" id="loginEmail" placeholder="Email address" class="input-field">
+                        <input type="password" id="loginPassword" placeholder="Password" class="input-field">
+                        <button type="submit" class="btn btn-primary btn-block" id="loginSubmitBtn">Log In</button>
                     </div>
-                </div>
+                </form>
 
-                <!-- Step 4: Class/Year -->
-                <div class="form-step hidden" id="authStep4">
-                    <h3>Step 4 of 6: Class / Year</h3>
-                    <select id="authClass" class="input-field" required disabled>
-                        <option value="">Select your class/year</option>
-                    </select>
-                    <div class="step-buttons">
-                        <button type="button" class="btn btn-secondary" onclick="prevAuthStep(4)">Back</button>
-                        <button type="button" class="btn btn-primary" onclick="nextAuthStep(4)">Continue</button>
-                    </div>
-                </div>
-
-                <!-- Step 5: Field (College/University only) -->
-                <div class="form-step hidden" id="authStep5">
-                    <h3>Step 5 of 6: Field / Stream</h3>
-                    <select id="authField" class="input-field" disabled>
-                        <option value="">Select your field</option>
-                    </select>
-                    <div class="step-buttons">
-                        <button type="button" class="btn btn-secondary" onclick="prevAuthStep(5)">Back</button>
-                        <button type="button" class="btn btn-primary" onclick="nextAuthStep(5)">Continue</button>
-                    </div>
-                </div>
-
-                <!-- Step 6: Email & Password -->
-                <div class="form-step hidden" id="authStep6">
-                    <h3>Step 6 of 6: Account Details</h3>
-                    <input type="email" id="authEmail" placeholder="Email address" class="input-field" required>
-                    <input type="password" id="authPassword" placeholder="Password (min 6 characters)" class="input-field" required minlength="6">
-                    <div class="step-buttons">
-                        <button type="button" class="btn btn-secondary" onclick="prevAuthStep(6)">Back</button>
-                        <button type="submit" class="btn btn-primary">Create Account</button>
-                    </div>
-                </div>
-            </form>
-
-            <div id="authError" class="error-text hidden"></div>
-            <div id="authSuccess" class="success-text hidden"></div>
+                <div id="authError" class="error-text hidden"></div>
+                <div id="authSuccess" class="success-text hidden"></div>
+            </div>
         </div>
     </div>
 
-    <!-- Profile Creation Modal (Naya) -->
-    <div id="profileModal" class="auth-overlay hidden">
-        <div class="auth-card card">
-            <div class="auth-header">
-                <i class="fa-solid fa-user-circle"></i>
-                <h2>Complete Your Profile</h2>
-                <p id="profileSubtitle">Help us customize your learning experience</p>
-            </div>
-            
-            <form id="profileForm" class="auth-form">
-                <div class="form-step" id="step1">
-                    <h3>Step 1 of 4: Education Level</h3>
-                    <select id="profileLevel" class="input-field" required>
-                        <option value="">Select Your Level</option>
-                        <option value="School">School</option>
-                        <option value="College">College</option>
-                        <option value="University">University</option>
-                    </select>
-                    <button type="button" class="btn btn-primary btn-block" onclick="nextStep(1)">Continue</button>
-                </div>
-
-                <div class="form-step hidden" id="step2">
-                    <h3>Step 2 of 4: Institute/School</h3>
-                    <select id="profileInstitute" class="input-field" required disabled>
-                        <option value="">Select Your Institute</option>
-                    </select>
-                    <div class="step-buttons">
-                        <button type="button" class="btn btn-secondary" onclick="prevStep(2)">Back</button>
-                        <button type="button" class="btn btn-primary" onclick="nextStep(2)">Continue</button>
-                    </div>
-                </div>
-
-                <div class="form-step hidden" id="step3">
-                    <h3>Step 3 of 4: Class / Year</h3>
-                    <select id="profileClass" class="input-field" required disabled>
-                        <option value="">Select Your Class/Year</option>
-                    </select>
-                    <div class="step-buttons">
-                        <button type="button" class="btn btn-secondary" onclick="prevStep(3)">Back</button>
-                        <button type="button" class="btn btn-primary" onclick="nextStep(3)">Continue</button>
-                    </div>
-                </div>
-
-                <div class="form-step hidden" id="step4">
-                    <h3>Step 4 of 4: Field / Stream (Optional)</h3>
-                    <select id="profileField" class="input-field" disabled>
-                        <option value="">Select Your Field (Optional)</option>
-                    </select>
-                    <div class="step-buttons">
-                        <button type="button" class="btn btn-secondary" onclick="prevStep(4)">Back</button>
-                        <button type="submit" class="btn btn-primary">Complete Profile</button>
-                    </div>
-                </div>
-            </form>
-            
-            <div id="profileError" class="error-text hidden"></div>
-            <div id="profileSuccess" class="success-text hidden"></div>
-        </div>
-    </div>
 
     <!-- AI Chatbot -->
     <div id="chatbotBtn" class="chatbot-btn">

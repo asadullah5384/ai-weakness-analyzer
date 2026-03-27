@@ -70,12 +70,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const authError = document.getElementById('authError');
     const authSuccess = document.getElementById('authSuccess');
     const authName = document.getElementById('authName');
-    const authLevel = document.getElementById('authLevel');
-    const authInstitute = document.getElementById('authInstitute');
-    const authClass = document.getElementById('authClass');
-    const authField = document.getElementById('authField');
     const authEmail = document.getElementById('authEmail');
     const authPassword = document.getElementById('authPassword');
+    
+    // Phase 5 Onboarding Fields
+    const authTypeSelect = document.getElementById('authTypeSelect');
+    const authInstituteSelect = document.getElementById('authInstituteSelect');
+    const authClassSelect = document.getElementById('authClassSelect');
+    const authFieldSelect = document.getElementById('authFieldSelect');
+    
+    // UI Elements
+    const sidebar = document.querySelector('.sidebar');
+    const chatbotBtn = document.getElementById('chatbotBtn');
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+
+    // Default: Hide App UI before login
+    if(sidebar) sidebar.style.display = 'none';
+    if(chatbotBtn) chatbotBtn.style.display = 'none';
+
+    if(mobileMenuBtn) {
+        mobileMenuBtn.addEventListener('click', () => {
+            if(sidebar) sidebar.classList.toggle('open');
+        });
+    }
+
+    function showAppUI() {
+        if(sidebar) sidebar.style.display = 'flex';
+        if(chatbotBtn) chatbotBtn.style.display = 'flex';
+        if(mobileMenuBtn) mobileMenuBtn.classList.remove('hidden');
+        setHeaderContext();
+    }
+
+    function setHeaderContext() {
+        const ctxBadge = document.getElementById('headerStudentContext');
+        if (ctxBadge) {
+            const pClass = localStorage.getItem('profileClass') || '';
+            ctxBadge.textContent = pClass ? `👤 ${pClass}` : '';
+        }
+    }
 
     // ==========================================
     // AUTHENTICATION FUNCTIONS (6-Step Signup)
@@ -100,151 +132,97 @@ document.addEventListener('DOMContentLoaded', () => {
         authError.classList.add('hidden');
     }
 
-    // 6-Step Navigation
-    window.nextAuthStep = async function(currentStep) {
-        clearAuthMessages();
+    // ==========================================
+    // PHASE 5: DYNAMIC ONBOARDING LOGIC
+    // ==========================================
+    if (authTypeSelect) {
+        authTypeSelect.addEventListener('change', async () => {
+            const type = authTypeSelect.value;
+            authInstituteSelect.innerHTML = '<option value="">Select Institute</option>';
+            authInstituteSelect.disabled = !type;
+            
+            authClassSelect.innerHTML = '<option value="">Select Class / Semester</option>';
+            authClassSelect.disabled = !type;
+            
+            authFieldSelect.innerHTML = '<option value="">Select Field</option>';
+            authFieldSelect.classList.add('hidden');
+            authFieldSelect.disabled = true;
+            authFieldSelect.removeAttribute('required');
 
-        if (currentStep === 1) {
-            if (!authName.value.trim()) {
-                showError('Please enter your name');
-                return;
+            if (type === 'School') {
+                ['Class 8', 'Class 9', 'Class 10'].forEach(c => authClassSelect.appendChild(new Option(c, c)));
+            } else if (type === 'College') {
+                authClassSelect.appendChild(new Option('Class 11 (1st Year)', 'Class 11'));
+                authClassSelect.appendChild(new Option('Class 12 (2nd Year)', 'Class 12'));
+            } else if (type === 'University') {
+                for(let i=1; i<=8; i++) authClassSelect.appendChild(new Option(`Semester ${i}`, `Semester ${i}`));
             }
-            document.getElementById('authStep1').classList.add('hidden');
-            document.getElementById('authStep2').classList.remove('hidden');
-        } else if (currentStep === 2) {
-            if (!authLevel.value) {
-                showError('Please select your grade level');
-                return;
+
+            if (!type) return;
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/institutes?type=${type}`);
+                const institutes = await res.json();
+                
+                // Filter Duplicates and limit to 15
+                const uniqueInstitutes = [];
+                const seen = new Set();
+                for (const inst of institutes) {
+                    if (!seen.has(inst.name)) {
+                        seen.add(inst.name);
+                        uniqueInstitutes.push(inst);
+                        if (uniqueInstitutes.length >= 15) break;
+                    }
+                }
+
+                uniqueInstitutes.forEach(inst => {
+                    const opt = document.createElement('option');
+                    opt.value = inst.institute_id;
+                    opt.textContent = inst.name;
+                    authInstituteSelect.appendChild(opt);
+                });
+            } catch (e) {
+                console.error("Error loading institutes:", e);
+                showError("Could not load institutes.");
             }
-            await loadAuthInstitutes();
-            document.getElementById('authStep2').classList.add('hidden');
-            document.getElementById('authStep3').classList.remove('hidden');
-        } else if (currentStep === 3) {
-            if (!authInstitute.value) {
-                showError('Please select your institute');
-                return;
-            }
-            await loadAuthClasses();
-            document.getElementById('authStep3').classList.add('hidden');
-            document.getElementById('authStep4').classList.remove('hidden');
-        } else if (currentStep === 4) {
-            if (!authClass.value) {
-                showError('Please select your class/year');
-                return;
-            }
-            if (authLevel.value === 'College' || authLevel.value === 'University') {
-                loadAuthFields();
-                document.getElementById('authStep4').classList.add('hidden');
-                document.getElementById('authStep5').classList.remove('hidden');
-            } else {
-                document.getElementById('authStep4').classList.add('hidden');
-                document.getElementById('authStep6').classList.remove('hidden');
-            }
-        } else if (currentStep === 5) {
-            if (!authField.value) {
-                showError('Please select your field');
-                return;
-            }
-            document.getElementById('authStep5').classList.add('hidden');
-            document.getElementById('authStep6').classList.remove('hidden');
-        }
-    };
-
-    window.prevAuthStep = function(currentStep) {
-        clearAuthMessages();
-
-        if (currentStep === 2) {
-            document.getElementById('authStep2').classList.add('hidden');
-            document.getElementById('authStep1').classList.remove('hidden');
-        } else if (currentStep === 3) {
-            document.getElementById('authStep3').classList.add('hidden');
-            document.getElementById('authStep2').classList.remove('hidden');
-        } else if (currentStep === 4) {
-            document.getElementById('authStep4').classList.add('hidden');
-            document.getElementById('authStep3').classList.remove('hidden');
-        } else if (currentStep === 5) {
-            document.getElementById('authStep5').classList.add('hidden');
-            document.getElementById('authStep4').classList.remove('hidden');
-        } else if (currentStep === 6) {
-            if (authLevel.value === 'College' || authLevel.value === 'University') {
-                document.getElementById('authStep6').classList.add('hidden');
-                document.getElementById('authStep5').classList.remove('hidden');
-            } else {
-                document.getElementById('authStep6').classList.add('hidden');
-                document.getElementById('authStep4').classList.remove('hidden');
-            }
-        }
-    };
-
-    // Load institutes for signup
-    async function loadAuthInstitutes() {
-        const level = authLevel.value;
-        authInstitute.innerHTML = '<option value="">Loading...</option>';
-
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/institutes?type=${level}`);
-            const institutes = await res.json();
-            authInstitute.innerHTML = '<option value="">Select your institute</option>';
-            institutes.slice(0, 10).forEach(inst => { // Show only 8-10 institutes
-                const opt = document.createElement('option');
-                opt.value = inst.institute_id;
-                opt.textContent = inst.name;
-                authInstitute.appendChild(opt);
-            });
-            authInstitute.disabled = false;
-        } catch (e) {
-            console.error("Error loading institutes:", e);
-            showError('Error loading institutes. Please try again.');
-        }
-    }
-
-    // Load classes for signup
-    async function loadAuthClasses() {
-        const instId = authInstitute.value;
-        authClass.innerHTML = '<option value="">Loading...</option>';
-
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/classes/${instId}`);
-            const classes = await res.json();
-            authClass.innerHTML = '<option value="">Select your class/year</option>';
-            classes.forEach(cls => {
-                const opt = document.createElement('option');
-                opt.value = cls.class_id;
-                opt.textContent = cls.name;
-                authClass.appendChild(opt);
-            });
-            authClass.disabled = false;
-        } catch (e) {
-            console.error("Error loading classes:", e);
-            showError('Error loading classes. Please try again.');
-        }
-    }
-
-    // Load fields for signup (College/University only)
-    function loadAuthFields() {
-        const className = authClass.options[authClass.selectedIndex].text;
-        const fieldsMap = {
-            'Pre-Engineering (11)': ['Pre-Engineering'],
-            'Pre-Engineering (12)': ['Pre-Engineering'],
-            'Pre-Medical (11)': ['Pre-Medical'],
-            'Pre-Medical (12)': ['Pre-Medical'],
-            'General Science (11)': ['General Science'],
-            'General Science (12)': ['General Science'],
-            'Undergraduate': ['Computer Science', 'BBA', 'Engineering', 'Medical', 'Arts']
-        };
-
-        const fields = fieldsMap[className] || [];
-        authField.innerHTML = '<option value="">Select your field</option>';
-
-        fields.forEach(field => {
-            const opt = document.createElement('option');
-            opt.value = field;
-            opt.textContent = field;
-            authField.appendChild(opt);
         });
-
-        authField.disabled = fields.length === 0;
     }
+
+    if (authClassSelect) {
+        authClassSelect.addEventListener('change', () => {
+            const cls = authClassSelect.value;
+            authFieldSelect.innerHTML = '<option value="">Select Field</option>';
+            
+            if (!cls || cls === 'Class 8') {
+                authFieldSelect.classList.add('hidden');
+                authFieldSelect.disabled = true;
+                authFieldSelect.removeAttribute('required');
+                return;
+            }
+            
+            let fields = [];
+            if (['Class 8', 'Class 9', 'Class 10'].includes(cls)) {
+                fields = ['Bio', 'Comp'];
+            } else if (['Class 11', 'Class 12'].includes(cls)) {
+                fields = ['Pre-Med', 'Pre-Eng', 'CS'];
+            } else if (cls && cls.startsWith('Semester')) {
+                fields = ['Software Engineering', 'Computer Science', 'BBA', 'AI', 'Cyber Security'];
+            }
+            
+            fields.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f;
+                opt.textContent = f;
+                authFieldSelect.appendChild(opt);
+            });
+            
+            authFieldSelect.classList.remove('hidden');
+            authFieldSelect.disabled = false;
+            authFieldSelect.setAttribute('required', 'true');
+        });
+    }
+
+    let isSignupMode = true;
 
     async function handleSignup() {
         if (!supabase) {
@@ -253,599 +231,283 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            // Sign up with Supabase Auth
+            authSubmitBtn.disabled = true;
+            authSubmitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
+
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: authEmail.value,
                 password: authPassword.value,
-                options: {
-                    data: {
-                        full_name: authName.value
-                    }
-                }
+                options: { data: { full_name: authName.value } }
             });
 
             if (authError) throw new Error(authError.message);
-
-            if (!authData.user) {
-                throw new Error('Signup failed. Please try again.');
-            }
+            if (!authData.user) throw new Error('Signup failed. Please try again.');
 
             // Save user data to localStorage
             localStorage.setItem('userId', authData.user.id);
             localStorage.setItem('userEmail', authEmail.value);
-            if (authName.value) localStorage.setItem('userName', authName.value);
-            localStorage.setItem('profileLevel', authLevel.value);
-            localStorage.setItem('profileInstitute', authInstitute.value);
-            localStorage.setItem('profileClass', authClass.value);
-            localStorage.setItem('className', authClass.options[authClass.selectedIndex].text);
-            if (authField.value) localStorage.setItem('profileField', authField.value);
+            localStorage.setItem('userName', authName.value);
+            
+            // Save Profile Data from Phase 5 Onboarding
+            const selectedClass = authClassSelect.value;
+            const selectedStream = authFieldSelect.value;
+            
+            let fullProfileClass = selectedClass;
+            if (selectedStream && selectedStream !== "") {
+                fullProfileClass = `${selectedClass} (${selectedStream})`;
+            }
+            
+            localStorage.setItem('className', selectedClass);
+            localStorage.setItem('profileField', selectedStream);
+            localStorage.setItem('profileClass', fullProfileClass);
 
             showSuccess('✓ Account created! Redirecting to dashboard...');
 
-            // Auto-login and redirect
             setTimeout(async () => {
-                const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+                const { error: loginError } = await supabase.auth.signInWithPassword({
                     email: authEmail.value,
                     password: authPassword.value
                 });
 
-                if (!loginError && loginData.user) {
+                if (!loginError) {
                     authOverlay.classList.add('hidden');
-                    initSelectionData();
-                    // Auto-load subjects
-                    await loadAutoSubjects(authClass.value);
-                    document.getElementById('inputSection').classList.remove('hidden');
-                    document.getElementById('dashboard-view').scrollIntoView({ behavior: 'smooth' });
+                    document.getElementById('userName')?.setAttribute('value', authName.value);
+                    showAppUI();
+                    
+                    const savedClass = localStorage.getItem('profileClass');
+                    if (savedClass) loadAutoSubjects(savedClass);
+                    
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
-            }, 1500);
+            }, 1000);
 
         } catch (err) {
             console.error('Signup error:', err);
             showError(err.message || 'Signup failed. Please try again.');
+        } finally {
+            authSubmitBtn.disabled = false;
+            authSubmitBtn.textContent = 'Create account';
+        }
+    }
+
+    async function handleLogin() {
+        if (!supabase) return showError('Supabase not configured.');
+
+        const email = document.getElementById('loginEmail').value.trim();
+        const pwd = document.getElementById('loginPassword').value.trim();
+        const loginBtn = document.getElementById('loginSubmitBtn');
+
+        if (!email || !pwd) return showError('Email and password are required.');
+
+        try {
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Logging in...';
+
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password: pwd });
+            if (error) throw error;
+
+            localStorage.setItem('userId', data.user.id);
+            localStorage.setItem('userEmail', data.user.email);
+            
+            showSuccess('Welcome back!');
+            
+            setTimeout(() => {
+                authOverlay.classList.add('hidden');
+                showAppUI();
+                document.getElementById('userName')?.setAttribute('value', data.user.user_metadata?.full_name || localStorage.getItem('userName') || '');
+                
+                // Load subjects based on saved class
+                const savedClass = localStorage.getItem('profileClass');
+                if (savedClass) loadAutoSubjects(savedClass);
+            }, 500);
+
+        } catch (err) {
+            console.error('Login error:', err);
+            showError(err.message || 'Invalid login credentials.');
+        } finally {
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Log In';
         }
     }
 
     // ==========================================
-    // AUTH FORM SUBMISSION
+    // AUTHENTICATION TOGGLE & SUBMIT
     // ==========================================
     authForm.addEventListener('submit', async (e) => {
-        e.preventDefault(); // Prevent page reload
-        
+        e.preventDefault();
         clearAuthMessages();
-        authSubmitBtn.disabled = true;
-
-        const email = document.getElementById('authEmail').value.trim();
-        const password = document.getElementById('authPassword').value.trim();
-        const name = document.getElementById('authName').value.trim();
-        const instId = document.getElementById('authInstituteSelect').value;
-        const classId = document.getElementById('authClassSelect').value;
-
-        // Validate inputs
-        if (!email || !password) {
-            showError('Email and password are required.');
-            authSubmitBtn.disabled = false;
-            return;
-        }
-
-        if (password.length < 6) {
-            showError('Password must be at least 6 characters long.');
-            authSubmitBtn.disabled = false;
-            return;
-        }
-
+        
         if (isSignupMode) {
-            if (!name) {
-                showError('Name is required for signup.');
-                authSubmitBtn.disabled = false;
+            const termsBox = document.getElementById('termsCheck');
+            if (termsBox && !termsBox.checked) {
+                showError('Please agree to the terms and conditions.');
                 return;
             }
-            await handleSignup(email, password, name, instId, classId);
+            await handleSignup();
         } else {
-            await handleLogin(email, password);
+            document.getElementById('loginStep').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
         }
-
-        authSubmitBtn.disabled = false;
     });
 
-    // ==========================================
-    // AUTH MODE TOGGLE (Login/Signup)
-    // ==========================================
-    function attachToggleListener() {
-        const toggleLink = document.getElementById('toggleAuthMode');
-        if (toggleLink) {
-            toggleLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                isSignupMode = !isSignupMode;
-                clearAuthMessages();
+    // We also need to listen to the specific login button because it's inside the same form visually but triggered differently.
+    document.getElementById('loginSubmitBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        handleLogin();
+    });
 
-                // Update UI
-                signupOnlyFields.classList.toggle('hidden');
-                authSubtitle.textContent = isSignupMode ? 'Create a new account' : 'Please login to continue';
-                authSubmitBtn.textContent = isSignupMode ? 'Sign Up' : 'Login';
-                
-                document.getElementById('toggleAuthText').innerHTML = isSignupMode 
-                    ? `Already have an account? <a href="#" id="toggleAuthMode">Login</a>`
-                    : `Don't have an account? <a href="#" id="toggleAuthMode">Sign Up</a>`;
+    const toggleLink = document.getElementById('toggleAuthMode');
+    if (toggleLink) {
+        toggleLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            isSignupMode = !isSignupMode;
+            clearAuthMessages();
 
-                if (isSignupMode) {
-                    initAuthSelectionData();
-                }
+            const signupStep = document.getElementById('signupStep');
+            const loginStep = document.getElementById('loginStep');
 
-                // Re-attach listener to new toggle link
-                attachToggleListener();
-            });
-        }
+            if (isSignupMode) {
+                // Show signup
+                signupStep.classList.remove('hidden');
+                loginStep.classList.add('hidden');
+                document.querySelector('.auth-header h2').textContent = 'Create an account';
+                document.getElementById('toggleAuthMode').textContent = 'Log in';
+                document.getElementById('toggleAuthMode').parentNode.childNodes[0].nodeValue = 'Already have an account? ';
+            } else {
+                // Show login
+                signupStep.classList.add('hidden');
+                loginStep.classList.remove('hidden');
+                document.querySelector('.auth-header h2').textContent = 'Welcome Back';
+                document.getElementById('toggleAuthMode').textContent = 'Sign up';
+                document.getElementById('toggleAuthMode').parentNode.childNodes[0].nodeValue = "Don't have an account? ";
+            }
+        });
     }
-
-    attachToggleListener();
 
     // ==========================================
     // CHECK EXISTING SESSION
     // ==========================================
     async function checkExistingSession() {
         if (!supabase) return;
-        
         try {
             const { data: { session }, error } = await supabase.auth.getSession();
-            
             if (error) throw error;
             
             if (session && session.user) {
-                // User is already logged in
                 authOverlay.classList.add('hidden');
-                document.getElementById('userName').value = session.user.user_metadata?.full_name || localStorage.getItem('userName') || '';
-                document.getElementById('userEmail').value = session.user.email || '';
+                showAppUI();
+                document.getElementById('userName')?.setAttribute('value', session.user.user_metadata?.full_name || localStorage.getItem('userName') || '');
+                document.getElementById('userEmail')?.setAttribute('value', session.user.email || '');
                 localStorage.setItem('userId', session.user.id);
                 localStorage.setItem('userEmail', session.user.email);
-                initSelectionData(); // Initialize Phase 2 data
+                
+                const savedClass = localStorage.getItem('profileClass');
+                if (savedClass) loadAutoSubjects(savedClass);
+                else {
+                    // Fallback load default subjects if old account mapping
+                    loadAutoSubjects('Class 9'); 
+                }
             }
-        } catch (err) {
-            console.error('Session check error:', err);
-        }
+        } catch (err) { console.error('Session check error:', err); }
     }
 
-    // Check for existing session on page load
-    if (supabase) {
-        checkExistingSession();
-    } else {
-        // Fallback: check localStorage if Supabase not configured
-        if (localStorage.getItem('userId')) {
-            authOverlay.classList.add('hidden');
-            document.getElementById('userName').value = localStorage.getItem('userName') || '';
-            document.getElementById('userEmail').value = localStorage.getItem('userEmail') || '';
-            initSelectionData();
-        }
+    if (supabase) checkExistingSession();
+    else if (localStorage.getItem('userId')) {
+        authOverlay.classList.add('hidden');
+        showAppUI();
+        const savedClass = localStorage.getItem('profileClass');
+        if (savedClass) loadAutoSubjects(savedClass);
     }
 
-    // ==========================================
     // LOGOUT FUNCTIONALITY
-    // ==========================================
     document.getElementById('logoutBtn').addEventListener('click', async () => {
-        if (supabase) {
-            const { error } = await supabase.auth.signOut();
-            if (error) console.error('Logout error:', error);
-        }
-        
-        // Clear localStorage
-        localStorage.removeItem('userId');
-        localStorage.removeItem('userEmail');
-        localStorage.removeItem('userName');
-        localStorage.removeItem('classId');
-
-        // Reset form
-        authForm.reset();
-        clearAuthMessages();
-        isSignupMode = false;
-        signupOnlyFields.classList.add('hidden');
-        authSubtitle.textContent = 'Please login to continue';
-        authSubmitBtn.textContent = 'Login';
-        document.getElementById('toggleAuthText').innerHTML = `Don't have an account? <a href="#" id="toggleAuthMode">Sign Up</a>`;
-        attachToggleListener();
-
-        // Show auth overlay
-        authOverlay.classList.remove('hidden');
+        if (supabase) await supabase.auth.signOut();
+        localStorage.clear();
+        window.location.reload();
     });
 
     // ==========================================
-    // PROFILE CREATION FORM LOGIC (NYA)
+    // SINDH BOARD SUBJECT AUTO-LOADER
     // ==========================================
-    // PROFILE MODAL LOGIC
-    // ==========================================
-    // Profile Modal Elements
-    const profileModal = document.getElementById('profileModal');
-    const profileForm = document.getElementById('profileForm');
-    const profileLevel = document.getElementById('profileLevel');
-    const profileInstitute = document.getElementById('profileInstitute');
-    const profileClass = document.getElementById('profileClass');
-    const profileField = document.getElementById('profileField');
-    const profileError = document.getElementById('profileError');
-    const profileSuccess = document.getElementById('profileSuccess');
-
-    // Step navigation functions
-    window.nextStep = async function(currentStep) {
-        if (currentStep === 1) {
-            if (!profileLevel.value) {
-                profileError.textContent = 'Please select your education level';
-                profileError.classList.remove('hidden');
-                return;
-            }
-            profileError.classList.add('hidden');
-            
-            // Populate institutes
-            await loadProfileInstitutes();
-            document.getElementById('step1').classList.add('hidden');
-            document.getElementById('step2').classList.remove('hidden');
-        } else if (currentStep === 2) {
-            if (!profileInstitute.value) {
-                profileError.textContent = 'Please select your institute';
-                profileError.classList.remove('hidden');
-                return;
-            }
-            profileError.classList.add('hidden');
-            
-            // Populate classes
-            await loadProfileClasses();
-            document.getElementById('step2').classList.add('hidden');
-            document.getElementById('step3').classList.remove('hidden');
-        } else if (currentStep === 3) {
-            if (!profileClass.value) {
-                profileError.textContent = 'Please select your class/year';
-                profileError.classList.remove('hidden');
-                return;
-            }
-            profileError.classList.add('hidden');
-            
-            // If college, show field selection step
-            if (profileLevel.value === 'College') {
-                loadProfileFields();
-                document.getElementById('step3').classList.add('hidden');
-                document.getElementById('step4').classList.remove('hidden');
-            } else {
-                // For school and university, skip field step and submit
-                profileForm.dispatchEvent(new Event('submit'));
-            }
-        }
-    };
-
-    window.prevStep = function(currentStep) {
-        if (currentStep === 2) {
-            document.getElementById('step2').classList.add('hidden');
-            document.getElementById('step1').classList.remove('hidden');
-        } else if (currentStep === 3) {
-            document.getElementById('step3').classList.add('hidden');
-            document.getElementById('step2').classList.remove('hidden');
-        } else if (currentStep === 4) {
-            document.getElementById('step4').classList.add('hidden');
-            document.getElementById('step3').classList.remove('hidden');
-        }
-        profileError.classList.add('hidden');
-    };
-
-    // Load institutes based on level
-    async function loadProfileInstitutes() {
-        const level = profileLevel.value;
-        profileInstitute.innerHTML = '<option value="">Loading...</option>';
-        
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/institutes?type=${level}`);
-            const institutes = await res.json();
-            profileInstitute.innerHTML = '<option value="">Select Your Institute</option>';
-            institutes.forEach(inst => {
-                const opt = document.createElement('option');
-                opt.value = inst.institute_id;
-                opt.textContent = inst.name;
-                profileInstitute.appendChild(opt);
-            });
-            profileInstitute.disabled = false;
-        } catch (e) {
-            console.error("Error loading institutes:", e);
-            profileError.textContent = 'Error loading institutes. Please try again.';
-            profileError.classList.remove('hidden');
-        }
-    }
-
-    // Load classes based on institute
-    async function loadProfileClasses() {
-        const instId = profileInstitute.value;
-        profileClass.innerHTML = '<option value="">Loading...</option>';
-        
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/classes/${instId}`);
-            const classes = await res.json();
-            profileClass.innerHTML = '<option value="">Select Your Class/Year</option>';
-            classes.forEach(cls => {
-                const opt = document.createElement('option');
-                opt.value = cls.class_id;
-                opt.textContent = cls.name;
-                profileClass.appendChild(opt);
-            });
-            profileClass.disabled = false;
-        } catch (e) {
-            console.error("Error loading classes:", e);
-            profileError.textContent = 'Error loading classes. Please try again.';
-            profileError.classList.remove('hidden');
-        }
-    }
-
-    // Load fields based on class (for colleges only)
-    function loadProfileFields() {
-        const className = profileClass.options[profileClass.selectedIndex].text;
-        const fieldsMap = {
-            'Pre-Engineering (11)': ['Pre-Engineering'],
-            'Pre-Engineering (12)': ['Pre-Engineering'],
-            'Pre-Medical (11)': ['Pre-Medical'],
-            'Pre-Medical (12)': ['Pre-Medical'],
-            'General Science (11)': ['General Science'],
-            'General Science (12)': ['General Science']
-        };
-        
-        const fields = fieldsMap[className] || [];
-        profileField.innerHTML = '<option value="">Select Your Field (Optional)</option>';
-        
-        fields.forEach(field => {
-            const opt = document.createElement('option');
-            opt.value = field;
-            opt.textContent = field;
-            profileField.appendChild(opt);
-        });
-        
-        profileField.disabled = fields.length === 0;
-    }
-
-    // Handle profile form submission
-    profileForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        if (!profileClass.value) {
-            profileError.textContent = 'Please select your class/year';
-            profileError.classList.remove('hidden');
-            return;
-        }
-
-        try {
-            const userId = localStorage.getItem('userId');
-            const userName = document.getElementById('userName').value;
-            const userEmail = localStorage.getItem('userEmail');
-            
-            // Save profile to localStorage
-            localStorage.setItem('profileLevel', profileLevel.value);
-            localStorage.setItem('profileInstitute', profileInstitute.value);
-            localStorage.setItem('profileClass', profileClass.value);
-            localStorage.setItem('className', profileClass.options[profileClass.selectedIndex].text);
-            
-            // Save field if it exists (for colleges)
-            if (profileField.value) {
-                localStorage.setItem('profileField', profileField.value);
-            }
-            
-            profileSuccess.textContent = '✓ Profile completed successfully!';
-            profileSuccess.classList.remove('hidden');
-            profileError.classList.add('hidden');
-            
-            // Auto-load subjects based on selected class
-            await loadAutoSubjects(profileClass.value);
-            
-            // Close modal after 1.5 seconds
-            setTimeout(() => {
-                profileModal.classList.add('hidden');
-                document.getElementById('inputSection').classList.remove('hidden');
-                document.getElementById('dashboard-view').scrollIntoView({ behavior: 'smooth' });
-            }, 1500);
-            
-        } catch (err) {
-            console.error('Profile save error:', err);
-            profileError.textContent = err.message || 'Error saving profile';
-            profileError.classList.remove('hidden');
-        }
-    });
-
-    // Auto-load subjects based on class
     async function loadAutoSubjects(classId) {
         const subjectsList = document.getElementById('subjectsList');
+        const className = localStorage.getItem('className') || '';
+        const fieldName = localStorage.getItem('profileField') || '';
+
+        // Strict Mappings for Sindh Board based on Class & Stream with accurate Max Marks
+        const sindhBoardMap = {
+            'Class 8': [{name: 'English', max: 100}, {name: 'Urdu', max: 100}, {name: 'Islamiat', max: 100}, {name: 'Pakistan Studies', max: 100}, {name: 'Maths', max: 100}, {name: 'Computer', max: 100}],
+            'Class 9 (Bio)': [{name: 'Biology', max: 60}, {name: 'Physics', max: 60}, {name: 'Chemistry', max: 60}, {name: 'English', max: 100}, {name: 'Islamiat', max: 75}, {name: 'Urdu', max: 75}, {name: 'Maths', max: 75}],
+            'Class 9 (Comp)': [{name: 'Computer', max: 60}, {name: 'Physics', max: 60}, {name: 'Chemistry', max: 60}, {name: 'English', max: 100}, {name: 'Islamiat', max: 75}, {name: 'Urdu', max: 75}, {name: 'Maths', max: 75}],
+            'Class 10 (Bio)': [{name: 'Biology', max: 60}, {name: 'Physics', max: 60}, {name: 'Chemistry', max: 60}, {name: 'English', max: 100}, {name: 'Pakistan Studies', max: 75}, {name: 'Sindhi', max: 75}, {name: 'Maths', max: 75}],
+            'Class 10 (Comp)': [{name: 'Computer', max: 60}, {name: 'Physics', max: 60}, {name: 'Chemistry', max: 60}, {name: 'English', max: 100}, {name: 'Pakistan Studies', max: 75}, {name: 'Sindhi', max: 75}, {name: 'Maths', max: 75}],
+            'Class 11 (Pre-Med)': [{name: 'Physics', max: 85}, {name: 'Chemistry', max: 85}, {name: 'English', max: 100}, {name: 'Islamiat', max: 50}, {name: 'Urdu', max: 100}, {name: 'Biology', max: 85}],
+            'Class 11 (Pre-Eng)': [{name: 'Physics', max: 85}, {name: 'Chemistry', max: 85}, {name: 'English', max: 100}, {name: 'Islamiat', max: 50}, {name: 'Urdu', max: 100}, {name: 'Maths', max: 100}],
+            'Class 11 (CS)': [{name: 'Physics', max: 85}, {name: 'Computer', max: 85}, {name: 'English', max: 100}, {name: 'Islamiat', max: 50}, {name: 'Urdu', max: 100}, {name: 'Maths', max: 100}],
+            'Class 12 (Pre-Med)': [{name: 'Physics', max: 85}, {name: 'Chemistry', max: 85}, {name: 'English', max: 100}, {name: 'Pakistan Studies', max: 50}, {name: 'Urdu', max: 100}, {name: 'Biology', max: 85}],
+            'Class 12 (Pre-Eng)': [{name: 'Physics', max: 85}, {name: 'Chemistry', max: 85}, {name: 'English', max: 100}, {name: 'Pakistan Studies', max: 50}, {name: 'Urdu', max: 100}, {name: 'Maths', max: 100}],
+            'Class 12 (CS)': [{name: 'Physics', max: 85}, {name: 'Computer', max: 85}, {name: 'English', max: 100}, {name: 'Pakistan Studies', max: 50}, {name: 'Urdu', max: 100}, {name: 'Maths', max: 100}]
+        };
+
+        const lookupKey = localStorage.getItem('profileClass');
+        let subjects = sindhBoardMap[lookupKey] || [{name: 'English', max: 100}, {name: 'Math', max: 100}, {name: 'Science', max: 100}];
         
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/subjects/${classId}`);
-            if (!res.ok) throw new Error('Failed to load subjects');
+        subjectsList.innerHTML = '';
+        subjectCount = 0;
+        
+        const heading = document.createElement('h3');
+        heading.style.marginTop = '1.5rem';
+        heading.style.marginBottom = '1rem';
+        heading.innerHTML = '<i class="fa-solid fa-book"></i> Your Subjects';
+        subjectsList.appendChild(heading);
+        
+        const grid = document.createElement('div');
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+        grid.style.gap = '1rem';
+        grid.style.marginBottom = '1.5rem';
+        
+        subjects.forEach(subject => {
+            const card = document.createElement('div');
+            // Remove manual close functionality
+            card.className = 'subject-card';
+            card.style.background = 'var(--card-bg)';
+            card.style.border = '1px solid var(--border)';
+            card.style.borderRadius = '12px';
+            card.style.padding = '1.2rem';
+            card.style.transition = '0.3s';
             
-            const subjects = await res.json();
-            
-            // Clear and populate subjects
-            subjectsList.innerHTML = '';
-            subjectCount = 0;
-            
-            if (subjects.length > 0) {
-                // Add heading
-                const heading = document.createElement('h3');
-                heading.style.marginTop = '1.5rem';
-                heading.style.marginBottom = '1rem';
-                heading.innerHTML = '<i class="fa-solid fa-book"></i> Your Subjects';
-                subjectsList.appendChild(heading);
-                
-                // Create subjects grid
-                const grid = document.createElement('div');
-                grid.style.display = 'grid';
-                grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
-                grid.style.gap = '1rem';
-                grid.style.marginBottom = '1.5rem';
-                
-                // Add each subject as a card
-                subjects.forEach(subject => {
-                    const card = document.createElement('div');
-                    card.className = 'subject-card';
-                    card.style.background = 'rgba(88, 166, 255, 0.1)';
-                    card.style.border = '1px solid rgba(88, 166, 255, 0.3)';
-                    card.style.borderRadius = '8px';
-                    card.style.padding = '1rem';
-                    card.style.transition = '0.3s';
-                    
-                    card.innerHTML = `
-                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem;">
-                            <i class="fa-solid fa-subject" style="color: var(--accent); font-size: 1.2rem;"></i>
-                            <h4 style="margin: 0; font-size: 1rem;">${subject.name || subject}</h4>
-                        </div>
-                        <input type="number" 
-                               class="input-field subj-auto-marks" 
-                               data-subject="${subject.name || subject}" 
-                               placeholder="Marks (0-100)" 
-                               min="0" max="100"
-                               style="margin: 0;">
-                    `;
-                    
-                    card.addEventListener('mouseenter', () => {
-                        card.style.background = 'rgba(88, 166, 255, 0.2)';
-                        card.style.borderColor = 'rgba(88, 166, 255, 0.5)';
-                    });
-                    card.addEventListener('mouseleave', () => {
-                        card.style.background = 'rgba(88, 166, 255, 0.1)';
-                        card.style.borderColor = 'rgba(88, 166, 255, 0.3)';
-                    });
-                    
-                    grid.appendChild(card);
-                });
-                
-                subjectsList.appendChild(grid);
-                
-                // Hide add subject button
-                document.getElementById('addSubjectBtn').style.display = 'none';
-            } else {
-                // No subjects found, show manual entry
-                const msg = document.createElement('p');
-                msg.textContent = 'No subjects found. Add them manually below.';
-                msg.style.color = 'var(--text-muted)';
-                msg.style.textAlign = 'center';
-                subjectsList.appendChild(msg);
-            }
-        } catch (err) {
-            console.error('Error loading subjects:', err);
-            // Fallback: show manual entry
-            const msg = document.createElement('p');
-            msg.textContent = 'Could not load subjects automatically. Add them manually below.';
-            msg.style.color = 'var(--warning)';
-            subjectsList.appendChild(msg);
-        }
+            card.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-book-open" style="color: var(--accent); font-size: 1.2rem;"></i>
+                        <h4 style="margin: 0; font-size: 1.1rem; color: #fff;">${subject.name}</h4>
+                    </div>
+                    <span style="font-size: 0.8rem; background: rgba(255,255,255,0.1); padding: 0.2rem 0.5rem; border-radius: 12px; color: var(--text-muted);">/${subject.max} Marks</span>
+                </div>
+                <input type="number" 
+                       class="input-field subj-auto-marks" 
+                       data-subject="${subject.name}" 
+                       data-max="${subject.max}"
+                       placeholder="Enter marks 0-${subject.max}" 
+                       min="0" max="${subject.max}"
+                       style="margin: 0; width: 100%; border: 1px solid rgba(255,255,255,0.1);">
+            `;
+            grid.appendChild(card);
+        });
+        
+        subjectsList.appendChild(grid);
+        
+        // Hide add subject button completely
+        const addSubjBtn = document.getElementById('addSubjectBtn');
+        if (addSubjBtn) addSubjBtn.style.display = 'none';
+        const addSubjSection = document.getElementById('subjectInputs');
+        if (addSubjSection) addSubjSection.style.display = 'none';
     }
 
     // ==========================================
-    // SELECTION LOGIC (Phase 2 & 2.5)
+    // SELECTION LOGIC (DASHBOARD) - REMOVED
     // ==========================================
-    const typeSelect = document.getElementById('typeSelect');
-    const instituteSelect = document.getElementById('instituteSelect');
-    const classSelect = document.getElementById('classSelect');
-
-    const authTypeSelect = document.getElementById('authTypeSelect');
-    const authInstituteSelect = document.getElementById('authInstituteSelect');
-    const authClassSelect = document.getElementById('authClassSelect');
-
-    function setupSelectionListeners() {
-        typeSelect.addEventListener('change', loadInstitutes);
-        instituteSelect.addEventListener('change', loadClasses);
-        classSelect.addEventListener('change', loadSubjects);
-        
-        authTypeSelect.addEventListener('change', loadAuthInstitutes);
-        authInstituteSelect.addEventListener('change', loadAuthClasses);
-    }
-
-    async function loadInstitutes() {
-        const type = typeSelect.value;
-        instituteSelect.innerHTML = '<option value="">Select Institute</option>';
-        instituteSelect.disabled = !type;
-        classSelect.innerHTML = '<option value="">Select Class / Field</option>';
-        classSelect.disabled = true;
-        
-        if (!type) return;
-
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/institutes?type=${type}`);
-            const institutes = await res.json();
-            institutes.forEach(inst => {
-                const opt = document.createElement('option');
-                opt.value = inst.institute_id;
-                opt.textContent = inst.name;
-                instituteSelect.appendChild(opt);
-            });
-        } catch (e) { console.error("Error loading institutes:", e); }
-    }
-
-    async function loadClasses() {
-        const instId = instituteSelect.value;
-        classSelect.innerHTML = '<option value="">Select Class / Field</option>';
-        classSelect.disabled = !instId;
-        if (!instId) return;
-
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/classes/${instId}`);
-            const classes = await res.json();
-            classes.forEach(cls => {
-                const opt = document.createElement('option');
-                opt.value = cls.class_id;
-                opt.textContent = cls.name;
-                classSelect.appendChild(opt);
-            });
-        } catch (e) { console.error("Error loading classes:", e); }
-    }
-
-    async function loadSubjects() {
-        const classId = classSelect.value;
-        if (!classId) return;
-
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/subjects/${classId}`);
-            const subjects = await res.json();
-            
-            subjectsList.innerHTML = '';
-            subjectCount = 0;
-            if (subjects.length > 0) {
-                subjects.forEach(sub => addSubjectRow(sub.name));
-            } else {
-                addSubjectRow();
-            }
-        } catch (e) { console.error("Error loading subjects:", e); }
-    }
-
-    async function loadAuthInstitutes() {
-        const type = authTypeSelect.value;
-        authInstituteSelect.innerHTML = '<option value="">Select Institute</option>';
-        authInstituteSelect.disabled = !type;
-        authClassSelect.innerHTML = '<option value="">Select Class</option>';
-        authClassSelect.disabled = true;
-        if (!type) return;
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/institutes?type=${type}`);
-            const institutes = await res.json();
-            institutes.forEach(inst => {
-                const opt = document.createElement('option');
-                opt.value = inst.institute_id;
-                opt.textContent = inst.name;
-                authInstituteSelect.appendChild(opt);
-            });
-        } catch (e) { console.error("Error loading institutes:", e); }
-    }
-
-    async function loadAuthClasses() {
-        const instId = authInstituteSelect.value;
-        authClassSelect.innerHTML = '<option value="">Select Class</option>';
-        authClassSelect.disabled = !instId;
-        if (!instId) return;
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/classes/${instId}`);
-            const classes = await res.json();
-            classes.forEach(cls => {
-                const opt = document.createElement('option');
-                opt.value = cls.class_id;
-                opt.textContent = cls.name;
-                authClassSelect.appendChild(opt);
-            });
-        } catch (e) { console.error("Error loading classes:", e); }
-    }
-
-    function initSelectionData() {
-        setupSelectionListeners();
-    }
-
-    function initAuthSelectionData() {
-        setupSelectionListeners();
-    }
-
+    // The Dashboard selection dropdown logic was purged as it was consolidated into the Signup Onboarding Flow (Phase 5).
     // 1. Navigation Logic
     const navLinks = document.querySelectorAll('.nav-links li');
     const views = document.querySelectorAll('.view-section');
@@ -871,14 +533,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 2. Dashboard / Analysis Logic
+    const recordYearSelect = document.getElementById('recordYear');
+    if (recordYearSelect) {
+        const currentYear = new Date().getFullYear();
+        for (let y = 2000; y <= 2050; y++) {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = y;
+            if (y === currentYear) opt.selected = true;
+            recordYearSelect.appendChild(opt);
+        }
+    }
+
+    const recordMonthSelect = document.getElementById('recordMonth');
+    if (recordMonthSelect) {
+        recordMonthSelect.addEventListener('change', () => {
+             document.querySelectorAll('.subj-marks, .subj-auto-marks').forEach(inp => inp.value = '');
+        });
+    }
+
     let subjectCount = 0;
     const subjectsList = document.getElementById('subjectsList');
     addSubjectRow();
     document.getElementById('addSubjectBtn').addEventListener('click', () => addSubjectRow());
     
     document.getElementById('analyzeBtn').addEventListener('click', async () => {
-        const userName = document.getElementById('userName').value.trim();
-        const userEmail = document.getElementById('userEmail').value.trim();
+        const userName = StorageHelper.getItem('userName') || 'Student';
+        const userEmail = StorageHelper.getItem('userEmail') || '';
+        const recordMonth = document.getElementById('recordMonth') ? document.getElementById('recordMonth').value : 'March';
+        const recordYear = document.getElementById('recordYear') ? parseInt(document.getElementById('recordYear').value) : 2026;
         
         if (userEmail) StorageHelper.setItem('userEmail', userEmail); // save for analytics
 
@@ -891,16 +574,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const name = row.querySelector('.subj-name').value.trim();
             const marks = parseInt(row.querySelector('.subj-marks').value.trim(), 10);
             if (!name || isNaN(marks) || marks < 0 || marks > 100) isValid = false;
-            else subjects.push({ name, marks });
+            else subjects.push({ name, marks, max_marks: 100 });
         });
         
         // Collect from auto-loaded subject cards (from profile selection)
         const cards = document.querySelectorAll('.subj-auto-marks');
         cards.forEach(input => {
             const name = input.getAttribute('data-subject');
+            const max = parseInt(input.getAttribute('data-max') || '100', 10);
             const marks = parseInt(input.value.trim(), 10);
-            if (name && !isNaN(marks) && marks >= 0 && marks <= 100) {
-                subjects.push({ name, marks });
+            if (name && !isNaN(marks) && marks >= 0 && marks <= max) {
+                subjects.push({ name, marks, max_marks: max });
             } else if (name && input.value.trim()) {
                 isValid = false; // Invalid marks entered
             }
@@ -915,7 +599,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${API_BASE_URL}/api/analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_name: userName, user_email: userEmail, subjects })
+                body: JSON.stringify({ 
+                    user_name: userName, 
+                    user_email: userEmail, 
+                    record_month: recordMonth,
+                    record_year: recordYear,
+                    subjects 
+                })
             });
             const data = await response.json();
             if(data.user_id) StorageHelper.setItem('userId', data.user_id); // Save for analytics
@@ -1012,75 +702,108 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             document.getElementById('aiSummary').classList.add('hidden');
         }
-        document.getElementById('aiFeedbackContent').textContent = feedback;
+        
+        function formatAiText(text) {
+            const urlRegex = /(https?:\/\/[^\s()]+)/g;
+            let formatted = text.replace(urlRegex, `<a href="$1" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline; word-break: break-all;">Link <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.8rem;"></i></a>`);
+            return formatted;
+        }
+        
+        document.getElementById('aiFeedbackContent').innerHTML = formatAiText(feedback);
     }
 
     // 3. Analytics Logic
     let myChart = null;
+    let globalPerformanceData = [];
+
     async function loadAnalytics() {
         const userId = localStorage.getItem('userId');
         if(!userId) return;
         try {
             const response = await fetch(`${API_BASE_URL}/api/history/${userId}`);
             const data = await response.json();
-            if(data.performance && data.performance.length > 0) renderAnalytics(data.performance);
+            if(data.performance && data.performance.length > 0) {
+                globalPerformanceData = data.performance;
+                
+                // Keep the filter selection in sync if they previously selected it
+                const filterVal = document.getElementById('analyticsMonthFilter') ? document.getElementById('analyticsMonthFilter').value : 'Overall';
+                let dataToRender = globalPerformanceData;
+                if (filterVal !== 'Overall') {
+                    dataToRender = globalPerformanceData.filter(r => r.record_month === filterVal);
+                }
+                
+                if (dataToRender.length > 0) renderAnalytics(dataToRender);
+            }
         } catch(e) { console.error(e); }
     }
 
+    const analyticsMonthFilter = document.getElementById('analyticsMonthFilter');
+    if (analyticsMonthFilter) {
+        analyticsMonthFilter.addEventListener('change', () => {
+            if (!globalPerformanceData.length) return;
+            const selectedMonth = analyticsMonthFilter.value;
+            let filteredData = globalPerformanceData;
+            
+            if (selectedMonth !== 'Overall') {
+                filteredData = globalPerformanceData.filter(r => r.record_month === selectedMonth);
+            }
+            
+            if (filteredData.length > 0) {
+                renderAnalytics(filteredData);
+            } else {
+                if (myChart) myChart.destroy();
+                document.getElementById('compareStats').innerHTML = `<p>No records found for ${selectedMonth}.</p>`;
+            }
+        });
+    }
+
     function renderAnalytics(performanceRecords) {
-        // Group by subject and find unique attempts (by created_at)
-        const attemptsMap = {}; 
-        performanceRecords.forEach(r => {
-            const time = new Date(r.created_at).toLocaleDateString();
-            if(!attemptsMap[time]) attemptsMap[time] = {};
-            const sName = r.subjects ? r.subjects.name : 'Unknown';
-            attemptsMap[time][sName] = r.marks;
+        // Simplify to just show latest marks for each subject in a Bar chart
+        const latestMarks = {};
+        performanceRecords.sort((a,b) => new Date(a.created_at) - new Date(b.created_at)).forEach(r => {
+            if(r.subjects) latestMarks[r.subjects.name] = r.marks;
         });
 
-        const dates = Object.keys(attemptsMap).sort((a,b) => new Date(a) - new Date(b));
-        const subjects = [...new Set(performanceRecords.map(r => r.subjects ? r.subjects.name : 'Unknown'))];
+        const subjects = Object.keys(latestMarks);
+        const marks = Object.values(latestMarks);
         
-        const datasets = subjects.map((sub, idx) => {
-            const colors = ['#58a6ff', '#3fb950', '#f85149', '#d29922', '#9b51e0'];
-            return {
-                label: sub,
-                data: dates.map(d => attemptsMap[d][sub] || null),
-                borderColor: colors[idx % colors.length],
-                tension: 0.3,
-                fill: false,
-                spanGaps: true
-            };
-        });
+        // Green > 75, Yellow > 50, Red < 50
+        const bgColors = marks.map(m => m >= 75 ? '#22c55e' : (m >= 50 ? '#eab308' : '#ef4444'));
 
         const ctx = document.getElementById('performanceChart').getContext('2d');
         if(myChart) myChart.destroy();
         
         myChart = new Chart(ctx, {
-            type: 'line',
+            type: 'bar',
             data: {
-                labels: dates,
-                datasets: datasets
+                labels: subjects,
+                datasets: [{
+                    label: 'Current performance (%)',
+                    data: marks,
+                    backgroundColor: bgColors,
+                    borderRadius: 8
+                }]
             },
             options: { 
                 responsive: true, 
                 maintainAspectRatio: false, 
                 scales: { 
-                    y: { beginAtZero: true, max: 100, ticks: {color: '#e6edf3'} }, 
-                    x: { ticks: {color: '#e6edf3'} } 
+                    y: { beginAtZero: true, max: 100, ticks: {color: '#f1f5f9'} }, 
+                    x: { ticks: {color: '#f1f5f9'} } 
                 }, 
                 plugins: { 
-                    legend: { labels: { color: '#e6edf3' } } 
+                    legend: { display: false } 
                 } 
             }
         });
 
-        // Textual comparison logic (simplified for Phase 3)
-        document.getElementById('compareStats').innerHTML = `Tracking progress across ${dates.length} attempts and ${subjects.length} subjects. Look at the lines to see your growth!`;
+        document.getElementById('compareStats').innerHTML = `<p>Here are your latest marks for the selected period!</p><p><span style="color:#22c55e">Green = Strong</span> | <span style="color:#eab308">Yellow = Average</span> | <span style="color:#ef4444">Red = Weak</span></p>`;
     }
 
     // 4. Countdown Timer & Goals Logic (Phase 4)
     let timerInterval = null;
-    let timeLeft = 25 * 60;
+    let baseTime = 25 * 60;
+    let timeLeft = baseTime;
     let isRunning = false;
     let focusMins = 0;
     let sessions = 0;
@@ -1090,7 +813,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnStart = document.getElementById('startTimerBtn');
     const btnPause = document.getElementById('pauseTimerBtn');
     const btnReset = document.getElementById('resetTimerBtn');
-    const btnBreak = document.getElementById('breakTimerBtn');
+    const customTimerInput = document.getElementById('customTimerInput');
+    const setTimerBtn = document.getElementById('setTimerBtn');
 
     function updateDisplay() {
         const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
@@ -1114,7 +838,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isRunning) {
             isRunning = true;
             status.textContent = "Focusing... No Distractions!";
-            document.body.style.background = "#010409"; // darker in focus
             btnStart.classList.add('hidden');
             btnPause.classList.remove('hidden');
             timerInterval = setInterval(() => {
@@ -1125,12 +848,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     clearInterval(timerInterval);
                     isRunning = false;
                     sessions++;
-                    focusMins += 25;
-                    document.getElementById('totalFocusMins').textContent = focusMins;
-                    document.getElementById('sessionsCompleted').textContent = sessions;
-                    saveStudySession(25); // Save to DB
+                    saveStudySession(Math.floor(baseTime / 60)); 
                     alert("Focus session completed! Great work.");
-                    setTimer(5 * 60, "Break Time!");
+                    setTimer(5, "Break Time!");
                 }
             }, 1000);
         } else {
@@ -1139,16 +859,15 @@ document.addEventListener('DOMContentLoaded', () => {
             status.textContent = "Paused";
             btnStart.classList.remove('hidden');
             btnPause.classList.add('hidden');
-            document.body.style.background = "linear-gradient(135deg, #0d1117 0%, #010409 100%)";
         }
     }
 
     function setTimer(minutes, textStatus) {
         clearInterval(timerInterval);
         isRunning = false;
-        timeLeft = minutes * 60;
+        baseTime = minutes * 60;
+        timeLeft = baseTime;
         status.textContent = textStatus;
-        document.body.style.background = "linear-gradient(135deg, #0d1117 0%, #010409 100%)";
         btnStart.classList.remove('hidden');
         btnPause.classList.add('hidden');
         updateDisplay();
@@ -1156,8 +875,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnStart.addEventListener('click', toggleTimer);
     btnPause.addEventListener('click', toggleTimer);
-    btnReset.addEventListener('click', () => setTimer(25, "Ready to Focus"));
-    btnBreak.addEventListener('click', () => setTimer(5, "Break Time!"));
+    btnReset.addEventListener('click', () => {
+        let currentMins = parseInt(customTimerInput.value) || 25;
+        setTimer(currentMins, "Ready to Focus");
+    });
+    
+    if (customTimerInput) {
+        customTimerInput.addEventListener('change', () => {
+             if (isRunning) return;
+             let mins = parseInt(customTimerInput.value) || 25;
+             if (mins > 0) setTimer(mins, `Set for ${mins} mins`);
+        });
+    }
+    
+    if (setTimerBtn && customTimerInput) {
+        setTimerBtn.addEventListener('click', () => {
+             let mins = parseInt(customTimerInput.value) || 25;
+             if (mins > 0) setTimer(mins, `Set for ${mins} mins`);
+        });
+    }
 
     // Goals Management
     const goalsList = document.getElementById('goalsList');
@@ -1169,17 +905,78 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!userId) return;
         try {
             const res = await fetch(`${API_BASE_URL}/api/goals/${userId}`);
-            const goals = await res.json();
+            const data = await res.json();
+            if (!res.ok) {
+                console.error("Goals Fetch Error:", data.detail || "Server failed");
+                return;
+            }
             goalsList.innerHTML = '';
-            goals.forEach(goal => renderGoal(goal));
+            if (Array.isArray(data)) {
+                data.forEach(goal => renderGoal(goal));
+            }
         } catch(e) { console.error(e); }
     }
 
     function renderGoal(goal) {
         const li = document.createElement('li');
         li.className = 'goal-item';
-        li.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>${goal.goal_text}</span>`;
+        li.dataset.id = goal.goal_id;
+        li.style.display = 'list-item'; // maintain default numbering
+        
+        const contentWrapper = document.createElement('div');
+        contentWrapper.style.display = 'inline-flex';
+        contentWrapper.style.justifyContent = 'space-between';
+        contentWrapper.style.alignItems = 'center';
+        contentWrapper.style.width = 'calc(100% - 10px)';
+        
+        contentWrapper.innerHTML = `
+            <span class="goal-text" style="flex:1; word-break: break-all;">${goal.goal_text}</span>
+            <div style="display: flex; gap: 0.8rem; padding-left: 1rem;">
+                <button class="edit-goal-btn" title="Edit" style="background:none; border:none; color: var(--warning); cursor:pointer; font-size: 0.9rem;"><i class="fa-solid fa-pen"></i></button>
+                <button class="delete-goal-btn" title="Delete" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size: 0.9rem;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        `;
+        li.appendChild(contentWrapper);
         goalsList.appendChild(li);
+
+        // Delete Logic
+        const delBtn = li.querySelector('.delete-goal-btn');
+        delBtn.addEventListener('click', async () => {
+            delBtn.disabled = true;
+            try {
+                await fetch(`${API_BASE_URL}/api/goals/${goal.goal_id}`, { method: 'DELETE' });
+                li.remove(); // The <ol> numbering will automatically update
+            } catch (e) {
+                console.error(e);
+                delBtn.disabled = false;
+            }
+        });
+
+        // Update Logic
+        const editBtn = li.querySelector('.edit-goal-btn');
+        const textSpan = li.querySelector('.goal-text');
+        editBtn.addEventListener('click', async () => {
+            const currentText = textSpan.textContent;
+            const newText = prompt("Edit your goal:", currentText);
+            if (newText && newText.trim() !== "" && newText !== currentText) {
+                editBtn.disabled = true;
+                try {
+                    const res = await fetch(`${API_BASE_URL}/api/goals/${goal.goal_id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ goal_text: newText.trim() })
+                    });
+                    const updatedData = await res.json();
+                    if (!res.ok) throw new Error(updatedData.detail || "Goal update failed");
+                    textSpan.textContent = updatedData.goal_text;
+                } catch (e) {
+                    alert("Unable to update goal. Error: " + e.message);
+                    console.error(e);
+                } finally {
+                    editBtn.disabled = false;
+                }
+            }
+        });
     }
 
     addGoalBtn.addEventListener('click', async () => {
@@ -1194,8 +991,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: userId, goal_text: text })
             });
-            const newGoal = await res.json();
-            renderGoal(newGoal);
+            const newData = await res.json();
+            if(!res.ok) {
+                alert("Failed to create goal in database! Did you run the SQL migration? Error: " + (newData.detail || "Unknown"));
+                throw new Error(newData.detail);
+            }
+            renderGoal(newData);
             newGoalInput.value = '';
         } catch(e) { console.error(e); }
         finally { addGoalBtn.disabled = false; }
@@ -1205,7 +1006,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // AI CHATBOT FUNCTIONS
     // ==========================================
     
-    const chatbotBtn = document.getElementById('chatbotBtn');
+    // chatbotBtn is declared globally at the top
     const chatbotModal = document.getElementById('chatbotModal');
     const closeChatbot = document.getElementById('closeChatbot');
     const chatMessages = document.getElementById('chatMessages');
@@ -1284,7 +1085,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
-        contentDiv.innerHTML = content.replace(/\n/g, '<br>');
+        
+        function formatAiChat(text) {
+            const urlRegex = /(https?:\/\/[^\s()]+)/g;
+            let formatted = text.replace(urlRegex, `<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #fff; text-decoration: underline; word-break: break-all;">Link <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.8rem;"></i></a>`);
+            return formatted.replace(/\n/g, '<br>');
+        }
+        
+        contentDiv.innerHTML = formatAiChat(content);
 
         messageDiv.appendChild(avatarDiv);
         messageDiv.appendChild(contentDiv);
@@ -1303,12 +1111,14 @@ document.addEventListener('DOMContentLoaded', () => {
         location.reload();
     });
 
-    // Check existing session
+    // Fallback logic for Local Storage Sessions
     if (StorageHelper.getItem('userId')) {
         authOverlay.classList.add('hidden');
-        document.getElementById('userName').value = StorageHelper.getItem('userName') || '';
-        document.getElementById('userEmail').value = localStorage.getItem('userEmail') || '';
-        initSelectionData(); 
-        loadGoals(); // Load Phase 4 data
+        showAppUI();
+        document.getElementById('userName')?.setAttribute('value', StorageHelper.getItem('userName') || '');
+        document.getElementById('userEmail')?.setAttribute('value', localStorage.getItem('userEmail') || '');
+        const savedClass = localStorage.getItem('profileClass');
+        if (savedClass) loadAutoSubjects(savedClass);
+        if (typeof loadGoals === 'function') loadGoals();
     }
 });
